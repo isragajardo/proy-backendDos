@@ -1,19 +1,20 @@
+const { Router } = require('express');
+const ProductManager = require('../services/ProductManager');
+const pm = new ProductManager('src/data/products.json');
 
-const express = require("express");
-const ProductManager = require("../../services/ProductManager");
-const manager = new ProductManager("src/data/products.json");
+module.exports = function (io) {
+  const router = Router();
 
-module.exports = function(io) {
-  const router = express.Router();
-
-  router.get("/home", async (req, res) => {
-    const products = await manager.getProducts();
-    res.render("home", { title: "Home", products });
+  // Home estático
+  router.get('/', async (req, res) => {
+    const products = await pm.getProducts();
+    res.render('home', { products });
   });
 
-  router.get("/realtimeproducts", async (req, res) => {
-    const products = await manager.getProducts();
-    res.render("realTimeProducts", { title: "Productos en Tiempo Real", products, realtime: true });
+  // Vista con WebSockets
+  router.get('/realtimeproducts', async (req, res) => {
+    const products = await pm.getProducts();
+    res.render('realTimeProducts', { products });
   });
 
   return router;

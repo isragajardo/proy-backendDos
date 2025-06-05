@@ -1,35 +1,31 @@
-
 const socket = io();
 
-socket.on("productsUpdated", (products) => {
-  const list = document.getElementById("productList");
-  list.innerHTML = "";
-  products.forEach(p => {
-    const li = document.createElement("li");
-    li.innerHTML = `<strong>${p.title}</strong> - ${p.description} ($${p.price}) <button onclick="deleteProduct('${p.id}')">Eliminar</button>`;
-    li.dataset.id = p.id;
-    list.appendChild(li);
-  });
-});
+socket.on('productsUpdated', renderProducts);
 
-document.getElementById("productForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData);
-  data.status = true;
-  data.thumbnails = [];
-
-  const res = await fetch("/api/products", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+document
+  .getElementById('productForm')
+  .addEventListener('submit', e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    data.status = true;
+    data.thumbnails = [];
+    socket.emit('addProduct', data);   // ⬅️ WebSocket, no fetch
+    e.target.reset();
   });
 
-  e.target.reset();
-});
+function deleteProduct(id) {
+  socket.emit('deleteProduct', id);    // ⬅️ WebSocket, no fetch
+}
 
-async function deleteProduct(id) {
-  await fetch("/api/products/" + id, {
-    method: "DELETE",
-  });
+function renderProducts(products) {
+  const list = document.getElementById('productList');
+  list.innerHTML = products
+    .map(
+      p => `
+      <li>
+        <strong>${p.title}</strong> – $${p.price}
+        <button onclick="deleteProduct('${p.id}')">Eliminar</button>
+      </li>`
+    )
+    .join('');
 }

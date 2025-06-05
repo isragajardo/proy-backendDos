@@ -1,5 +1,5 @@
 
-const ProductManager = require("../services/ProductManager");
+const ProductManager = require("../src/services/ProductManager");
 const manager = new ProductManager("src/data/products.json");
 
 let io = null;

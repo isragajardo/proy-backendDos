@@ -1,51 +1,57 @@
+const express = require('express');
+const { create } = require('express-handlebars');
+const path = require('path');
+const http = require('http');
+const socketio = require('socket.io');
 
-const express = require("express");
-const { create } = require("express-handlebars");
-const path = require("path");
-const http = require("http");
-const socketio = require("socket.io");
+const ProductManager = require('./src/services/ProductManager');
 
 const app = express();
-const server = http.createServer(app);
+const server = http.createServer(app);      // ⬅️  Socket.IO necesita el server http
 const io = socketio(server);
 
-// Middleware
+const hbs = create({
+  layoutsDir: path.join(__dirname, 'src/views/layouts'),
+  defaultLayout: 'main',
+  extname: '.handlebars',
+});
+
+app.engine('.handlebars', hbs.engine);
+app.set('view engine', '.handlebars');
+app.set('views', path.join(__dirname, 'src/views'));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Handlebars
-const hbs = create({
-  layoutsDir: path.join(__dirname, "src/views/layouts"),
-  defaultLayout: "main",
-  extname: ".handlebars",
-});
-app.engine(".handlebars", hbs.engine);
-app.set("view engine", ".handlebars");
-app.set("views", path.join(__dirname, "src/views"));
+// ─── Routers ─────────────────────────────────────────────────────────
+const productRoutes = require('./src/routes/products.router');
+const cartRoutes    = require('./src/routes/carts.router');
+const viewsRoutes   = require('./src/routes/views.router')(io);
 
-// Routers
-const { setSocketServer } = require("./controllers/productController");
-const productRoutes = require("./src/routes/products.router");
-const cartRoutes = require("./src/routes/carts.router");
-const viewsRoutes = require("./src/routes/views.router")(io);
+app.use('/api/products', productRoutes);
+app.use('/api/carts',    cartRoutes);
+app.use('/',             viewsRoutes);
 
-app.use("/api/products", productRoutes);
-app.use("/api/carts", cartRoutes);
-app.use("/", viewsRoutes);
+// ─── WebSockets ──────────────────────────────────────────────────────
+const pm = new ProductManager('src/data/products.json');
 
-setSocketServer(io);
+io.on('connection', async socket => {
+  console.log('🔌 Cliente conectado');
+  socket.emit('productsUpdated', await pm.getProducts());
 
-const ProductManager = require("./services/ProductManager");
-const productManager = new ProductManager("src/data/products.json");
+  socket.on('addProduct', async data => {
+    await pm.addProduct(data);
+    io.emit('productsUpdated', await pm.getProducts());
+  });
 
-// WebSocket: emitir productos al conectar
-io.on("connection", async (socket) => {
-  console.log("Cliente conectado");
-  const products = await productManager.getProducts();
-  socket.emit("productsUpdated", products);
+  socket.on('deleteProduct', async id => {
+    await pm.deleteProduct(id);
+    io.emit('productsUpdated', await pm.getProducts());
+  });
 });
 
-server.listen(8080, () => {
-  console.log("Servidor escuchando en puerto 8080");
-});
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () =>
+  console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`)
+);
